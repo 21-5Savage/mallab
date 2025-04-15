@@ -133,9 +133,10 @@ void *mm_malloc(size_t size)
                 set_as_allocated(current, block_size);
             }
             if (previous_allocated_flag) mark_previous_as_allocated(current);
-            previous_allocated_flag = 0;
+            previous_allocated_flag = 1;
             return move_ptr(current, SIZE_T_SIZE);
-        }
+        } else if (check_allocated(current)) previous_allocated_flag = 1;
+        else previous_allocated_flag = 0;
         current += block_size;
 
     }
