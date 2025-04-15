@@ -70,26 +70,26 @@ void *move_ptr(void *ptr, size_t value, int forward){
     return (void *)((char *)ptr + (long)value * forward);
 }
 
+void set_as_allocated(void *ptr, size_t value){
+    *(size_t *)ptr = value | 1;
+}
+
 void set_header_footer_allocated(void *ptr, size_t value){
     set_as_allocated(ptr, value);
     *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
-}
-
-void set_as_allocated(void *ptr, size_t value){
-    *(size_t *)ptr = value | 1;
 }
 
 void mark_previous_as_allocated(void *ptr){
     *(size_t *)ptr |= 2;
 }
 
+void set_as_free(void *ptr, size_t value){
+    *(size_t *)ptr = value & ~1;
+}
+
 void set_header_footer_free(void *ptr, size_t value){
     set_as_free(ptr, value);
     *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
-}
-
-void set_as_free(void *ptr, size_t value){
-    *(size_t *)ptr = value & ~1;
 }
 
 void mark_previous_as_free(void *ptr){
