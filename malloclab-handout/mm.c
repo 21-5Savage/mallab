@@ -92,7 +92,7 @@ void mark_previous_as_free(void *ptr) {
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
+    int newsize = ALIGN(size + 2 * SIZE_T_SIZE);
     // printf("Newsize: %d\n", newsize);
     void *p = root;
     if (!root){
