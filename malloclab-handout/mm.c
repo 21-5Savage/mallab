@@ -83,8 +83,15 @@ void mark_previous_as_allocated(void *ptr){
     *(size_t *)ptr |= 2;
 }
 
+void *get_next_ptr(void *ptr){
+    size_t block_size = get_block_size(ptr);
+    return move_ptr(ptr, block_size, 1);
+}
+
 void set_as_free(void *ptr, size_t value){
     *(size_t *)ptr = value & ~1;
+    ptr = get_next_ptr(ptr);
+    *(size_t *)ptr &= ~2;
 }
 
 void set_header_footer_free(void *ptr, size_t value){
@@ -180,7 +187,9 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
-
+    ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
+    size_t block_size = get_block_size(ptr);
+    set_as_free(ptr, block_size);
 }
 
 /*
