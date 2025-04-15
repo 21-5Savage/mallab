@@ -51,14 +51,6 @@ void mm_checkheap(int lineno){
     printf("checkheap called from %d\n", lineno);
 }
 
-
-/* 
- * mm_init - initialize the malloc package.
- */
-int mm_init(void){
-    return 0;
-}
-
 int check_allocated(void *ptr){
     return *(size_t *)ptr & 1;
 }
@@ -118,6 +110,21 @@ void mark_previous_as_free(void *ptr){
 void *find_header(void * ptr){
     return (void *)((char *)ptr - SIZE_T_SIZE);
 }
+
+/* 
+ * mm_init - initialize the malloc package.
+ */
+int mm_init(void){
+    root = mem_sbrk(ALIGN(SIZE_T_SIZE));
+    if (root == (void *)-1)
+        return -1;
+
+    // Initial dummy allocated block to simplify logic
+    set_as_allocated(root, SIZE_T_SIZE);
+    heap_end = (char *)root + SIZE_T_SIZE - 1;
+    return 0;
+}
+
 /* 
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
@@ -127,19 +134,6 @@ void *mm_malloc(size_t size)
     int newsize = ALIGN(size + 2 * SIZE_T_SIZE);
     // printf("Newsize: %d\n", newsize);
     void *p = root;
-    if (!root){
-        // printf("\naaaa\n");
-        root = mem_sbrk(SIZE_T_SIZE);
-        heap_end = (char *)root + SIZE_T_SIZE - 1;
-        if (root == (void *)-1){
-            // printf("\nbbbb\n");
-            return NULL;
-        }else{
-            set_as_allocated(root, SIZE_T_SIZE);
-            p = move_ptr(root, SIZE_T_SIZE, 1);
-            // printf("\ncccc\n");
-        }
-    }
     // printf("\ndddd\n");
 
     char *current = root;
