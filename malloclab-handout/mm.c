@@ -66,23 +66,33 @@ size_t get_block_size(void *ptr){
     return *(size_t *)ptr & ~3;
 }
 
-void *move_ptr(void *ptr, size_t value){
-    return (void *)((char *)ptr + value);
+void *move_ptr(void *ptr, size_t value, int forward){
+    return (void *)((char *)ptr + (long)value * forward);
 }
 
-void set_as_allocated(void *ptr, size_t value) {
+void set_header_footer_allocated(void *ptr, size_t value){
+    set_as_allocated(ptr, value);
+    *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
+}
+
+void set_as_allocated(void *ptr, size_t value){
     *(size_t *)ptr = value | 1;
 }
 
-void mark_previous_as_allocated(void *ptr) {
+void mark_previous_as_allocated(void *ptr){
     *(size_t *)ptr |= 2;
 }
 
-void set_as_free(void *ptr, size_t value) {
+void set_header_footer_free(void *ptr, size_t value){
+    set_as_free(ptr, value);
+    *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
+}
+
+void set_as_free(void *ptr, size_t value){
     *(size_t *)ptr = value & ~1;
 }
 
-void mark_previous_as_free(void *ptr) {
+void mark_previous_as_free(void *ptr){
     *(size_t *)ptr &= ~2;
 }
 
@@ -108,7 +118,7 @@ void *mm_malloc(size_t size)
             return NULL;
         }else{
             set_as_allocated(root, SIZE_T_SIZE);
-            p = move_ptr(root, SIZE_T_SIZE);
+            p = move_ptr(root, SIZE_T_SIZE, 1);
             // printf("\ncccc\n");
         }
     }
@@ -129,16 +139,16 @@ void *mm_malloc(size_t size)
         if (!check_allocated(current) && block_size >= newsize) {
             // printf("\nffff\n");
             if (block_size - newsize >= ALIGN(SIZE_T_SIZE + MIN_PAYLOAD)) {
-                set_as_allocated(current, newsize);
-                p = move_ptr(current, newsize);
-                set_as_free(p, block_size - newsize);
+                set_header_footer_allocated(current, newsize);
+                p = move_ptr(current, newsize, 1);
+                set_header_footer_free(p, block_size - newsize);
                 mark_previous_as_allocated(p);
             } else {
-                set_as_allocated(current, block_size);
+                set_header_footer_allocated(current, block_size);
             }
             if (previous_allocated_flag) mark_previous_as_allocated(current);
             previous_allocated_flag = 1;
-            return move_ptr(current, SIZE_T_SIZE);
+            return move_ptr(current, SIZE_T_SIZE, 1);
         } else if (check_allocated(current)) previous_allocated_flag = 1;
         else previous_allocated_flag = 0;
         current += block_size;
@@ -149,8 +159,8 @@ void *mm_malloc(size_t size)
     p = mem_sbrk(newsize);
     if (p == (void *)-1) return NULL;
     heap_end = (char *)p + newsize - 1;
-    set_as_allocated(p, newsize);
-    return move_ptr(p, SIZE_T_SIZE); 
+    set_header_footer_allocated(p, newsize);
+    return move_ptr(p, SIZE_T_SIZE, 1); 
 }
 
 // void *mm_malloc(size_t size)
