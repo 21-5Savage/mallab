@@ -93,7 +93,7 @@ void *get_next_ptr(void *ptr){
     return move_ptr(ptr, block_size, 1);
 }
 
-void *get_previous_ptr(void *ptr){
+void *get_prev_ptr(void *ptr){
     ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
     return move_ptr(ptr, block_size - SIZE_T_SIZE, -1);
@@ -196,11 +196,40 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block does nothing.
  */
+void *coalesce(void *ptr){
+    int prev_alloc = check_previous_allocated(ptr);
+    int next_alloc = check_allocated(get_next_ptr(ptr));
+    size_t block_size = get_block_size(ptr);
+    size_t size;
+    void *next = get_next_ptr(ptr);
+    void *prev = get_prev_ptr(ptr);
+    //case1
+    if (prev_alloc && !next_alloc) {
+        size = get_block_size((get_next_ptr(ptr)));
+        set_as_free(ptr, get_block_size(ptr));
+        set_as_free((void *)(*(char *)ptr + block_size - SIZE_T_SIZE), get_block_size(ptr));
+    }    
+    //case2
+    else if(!prev_alloc && next_alloc){
+
+    }
+    else if(prev_alloc && next_alloc){
+        return ptr;
+    }
+    else{
+
+    }
+    return ptr;
+}
+
 void mm_free(void *ptr)
 {
-    // ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
-    // size_t block_size = get_block_size(ptr);
-    // set_as_free(ptr, block_size);
+    if (ptr == NULL) return;
+
+    ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
+    size_t block_size = get_block_size(ptr);
+    set_as_free(ptr, block_size);
+    coalesce(ptr);
 }
 
 /*
