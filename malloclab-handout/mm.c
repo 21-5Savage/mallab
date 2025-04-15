@@ -35,7 +35,7 @@ team_t team = {
     "batenkhbadarch@gmail.com"
 };
 
-/* single word (4) or double word (😎 alignment */
+/* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 #define MIN_PAYLOAD 1
 /* rounds up to the nearest multiple of ALIGNMENT */
@@ -111,6 +111,7 @@ void *mm_malloc(size_t size)
     // printf("\ndddd\n");
 
     char *current = root;
+    int previous_allocated_flag = 0;
 
     while (current < (char *)heap_end) {
         // printf("current: %p\n", (void *)current);
@@ -127,9 +128,12 @@ void *mm_malloc(size_t size)
                 set_as_allocated(current, newsize);
                 p = move_ptr(current, newsize);
                 set_as_free(p, block_size - newsize);
+                mark_previous_as_allocated(p);
             } else {
                 set_as_allocated(current, block_size);
             }
+            if (previous_allocated_flag) mark_previous_as_allocated(current);
+            previous_allocated_flag = 0;
             return move_ptr(current, SIZE_T_SIZE);
         }
         current += block_size;
@@ -183,5 +187,3 @@ void *mm_realloc(void *ptr, size_t size)
     mm_free(oldptr);
     return newptr;
 }
-
-
