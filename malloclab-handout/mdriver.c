@@ -773,6 +773,8 @@ static double eval_mm_util(trace_t *trace, int tracenum, range_t **ranges)
 
         }
     }
+		// printf("\n\n%lf\n\n", (double)max_total_size);
+		// printf("\n\n%lf\n\n", (double)mem_heapsize());
 
     return ((double)max_total_size / (double)mem_heapsize());
 }

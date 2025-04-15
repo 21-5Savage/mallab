@@ -47,6 +47,11 @@ team_t team = {
 void *root = NULL;
 void *heap_end = NULL;
 
+void mm_checkheap(int lineno){
+    printf("checkheap called from %d\n", lineno);
+}
+
+
 /* 
  * mm_init - initialize the malloc package.
  */
@@ -86,6 +91,12 @@ void mark_previous_as_allocated(void *ptr){
 void *get_next_ptr(void *ptr){
     size_t block_size = get_block_size(ptr);
     return move_ptr(ptr, block_size, 1);
+}
+
+void *get_previous_ptr(void *ptr){
+    ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
+    size_t block_size = get_block_size(ptr);
+    return move_ptr(ptr, block_size - SIZE_T_SIZE, -1);
 }
 
 void set_as_free(void *ptr, size_t value){
@@ -162,7 +173,7 @@ void *mm_malloc(size_t size)
 
     }
     // printf("\ngggg\n");
-
+    // mm_checkheap(__LINE__);
     p = mem_sbrk(newsize);
     if (p == (void *)-1) return NULL;
     heap_end = (char *)p + newsize - 1;
@@ -187,9 +198,9 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
-    ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
-    size_t block_size = get_block_size(ptr);
-    set_as_free(ptr, block_size);
+    // ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
+    // size_t block_size = get_block_size(ptr);
+    // set_as_free(ptr, block_size);
 }
 
 /*
