@@ -86,6 +86,10 @@ void mark_previous_as_free(void *ptr) {
     *(size_t *)ptr &= ~2;
 }
 
+//return header
+void *find_header(void * ptr){
+    return (void *)((char *)ptr - SIZE_T_SIZE);
+}
 /* 
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
