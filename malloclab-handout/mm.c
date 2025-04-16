@@ -114,16 +114,26 @@ void *find_header(void * ptr){
 /* 
  * mm_init - initialize the malloc package.
  */
+
+ extern void *mem_heap_lo();
+ extern void *mem_heap_hi();
+ extern void mem_reset_brk(); // resets the heap to original state
+ 
+
+
+
 int mm_init(void){
-    root = mem_sbrk(ALIGN(SIZE_T_SIZE));
+    mem_reset_brk();
+
+    root = mem_sbrk(SIZE_T_SIZE);
     if (root == (void *)-1)
         return -1;
 
-    // Initial dummy allocated block to simplify logic
     set_as_allocated(root, SIZE_T_SIZE);
     heap_end = (char *)root + SIZE_T_SIZE - 1;
     return 0;
 }
+
 
 /* 
  * mm_malloc - Allocate a block by incrementing the brk pointer.
