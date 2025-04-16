@@ -106,22 +106,23 @@ static inline void set_header_footer_free(void *ptr, size_t value) {
 }
 
 
-void mm_checkheap(int lineno) {
+static inline void mm_checkheap(int lineno) {
     printf("checkheap called from %d\n", lineno);
 }
 
-void print_heap(){
+static inline void print_heap(){
     char *current = root;
     char *heap_end = (char *)mem_sbrk(0);
 
     while (current < heap_end) {
-        // printf("ptr: %lu\n", (unsigned long)(uintptr_t)current);
         printf("ptr: %lu\n", (unsigned long)(uintptr_t)current - (unsigned long)(uintptr_t)root);
         printf("value: %zu\n", get_block_size(current));
         printf("flags: %zu\n\n", GET_VALUE(current) % 8);
         size_t block_size = get_block_size(current);
         current += block_size;
     }
+    printf("heap_end: %lu\n", (unsigned long)(uintptr_t)mem_sbrk(0) - (unsigned long)(uintptr_t)root);
+
 }
 
 /*
@@ -132,8 +133,8 @@ int mm_init(void) {
     root = mem_sbrk(SIZE_T_SIZE);
     if (root == (void *)-1) return -1;
     set_as_allocated(root, SIZE_T_SIZE);
-    printf("\nafter innit\n\n");
-    print_heap();
+    // printf("\nafter innit\n\n");
+    // print_heap();
     return 0;
 }
 
@@ -162,8 +163,8 @@ void *mm_malloc(size_t size) {
             }
             if (previous_allocated_flag) mark_previous_as_allocated(current);
             previous_allocated_flag = 1;
-            printf("\nafter malloc fit\n\n");
-            print_heap();
+            // printf("\nafter malloc fit\n\n");
+            // print_heap();
             return move_ptr(current, SIZE_T_SIZE, 1);
         } else if (check_allocated(current)) {
             previous_allocated_flag = 1;
@@ -178,8 +179,8 @@ void *mm_malloc(size_t size) {
     set_header_footer_allocated(p, newsize);
     void *prev = get_prev_ptr(p);
     if (check_allocated(prev)) mark_previous_as_allocated(p);
-    printf("\nafter malloc sbrk\n\n");
-    print_heap();
+    // printf("\nafter malloc sbrk\n\n");
+    // print_heap();
     return move_ptr(p, SIZE_T_SIZE, 1);
 }
 
@@ -235,11 +236,11 @@ void mm_free(void *ptr_payload) {
     void *ptr = move_ptr(ptr_payload, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
     set_header_footer_free(ptr, block_size);
-    printf("\nfree before coalesce\n\n");
-    print_heap();
+    // printf("\nfree before coalesce\n\n");
+    // print_heap();
     coalesce(ptr);
-    printf("\nfree after coalesce\n\n");
-    print_heap();
+    // printf("\nfree after coalesce\n\n");
+    // print_heap();
 }
 
 /*
