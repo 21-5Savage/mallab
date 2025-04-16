@@ -1,14 +1,3 @@
-/*
- * mm-naive.c - The fastest, least memory-efficient malloc package.
- * 
- * In this naive approach, a block is allocated by simply incrementing
- * the brk pointer.  A block is pure payload. There are no headers or
- * footers.  Blocks are never coalesced or reused. Realloc is
- * implemented directly using mm_malloc and mm_free.
- *
- * NOTE TO STUDENTS: Replace this header comment with your own header
- * comment that gives a high level description of your solution.
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -41,138 +30,108 @@ team_t team = {
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-void *root = NULL;
-void *heap_end = NULL;
+#define GET(p) (*(size_t *)(p))
+#define PUT(p, val) (*(size_t *)(p) = (val))
+#define PACK(size, alloc, prev_alloc) ((size) | ((alloc) ? 1 : 0) | ((prev_alloc) ? 2 : 0))
+#define GET_SIZE(p)  (GET(p) & ~0x7)
+#define GET_ALLOC(p) (GET(p) & 0x1)
+#define GET_PREV_ALLOC(p) (GET(p) & 0x2)
 
-void mm_checkheap(int lineno){
-    printf("checkheap called from %d\n", lineno);
+static inline int check_allocated(void *ptr) {
+    return GET(ptr) & 1;
 }
 
-int check_allocated(void *ptr){
-    return *(size_t *)ptr & 1;
+static inline int check_previous_allocated(void *ptr) {
+    return GET(ptr) & 2;
 }
 
-int check_previous_allocated(void *ptr){
-    return *(size_t *)ptr & 2;
+static inline size_t get_block_size(void *ptr) {
+    return GET(ptr) & ~3;
 }
 
-size_t get_block_size(void *ptr){
-    mm_checkheap(__LINE__);
-    return *(size_t *)ptr & ~3;
-}
-
-void *move_ptr(void *ptr, size_t value, int forward){
+static inline void *move_ptr(void *ptr, size_t value, int forward) {
     return (void *)((char *)ptr + (long)value * forward);
 }
 
-void set_as_allocated(void *ptr, size_t value){
-    *(size_t *)ptr = value | 1;
+static inline void set_as_allocated(void *ptr, size_t value) {
+    PUT(ptr, value | 1);
 }
 
-void set_header_footer_allocated(void *ptr, size_t value){
+static inline void set_header_footer_allocated(void *ptr, size_t value) {
     set_as_allocated(ptr, value);
-    *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
+    PUT((char *)ptr + value - SIZE_T_SIZE, value);
 }
 
-void mark_previous_as_allocated(void *ptr){
-    *(size_t *)ptr |= 2;
+static inline void mark_previous_as_allocated(void *ptr) {
+    PUT(ptr, GET(ptr) | 2);
 }
 
-void *get_next_ptr(void *ptr) {
-    mm_checkheap(__LINE__);
+static inline void mark_previous_as_free(void *ptr) {
+    PUT(ptr, GET(ptr) & ~2);
+}
 
+static inline void *find_header(void *ptr_payload) {
+    return (void *)((char *)ptr_payload - SIZE_T_SIZE);
+}
+
+static inline void *get_next_ptr(void *ptr) {
     size_t size = get_block_size(ptr);
-    mm_checkheap(__LINE__);
-
-    if ((char *)ptr + size >= (char *)heap_end)
+    if ((char *)ptr + size >= (char *)mem_sbrk(0))
         return NULL;
-    mm_checkheap(__LINE__);
-
     return move_ptr(ptr, size, 1);
 }
 
-
-void *get_prev_ptr(void *ptr){
+static inline void *get_prev_ptr(void *ptr) {
     ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
     return move_ptr(ptr, block_size - SIZE_T_SIZE, -1);
 }
 
-void set_as_free(void *ptr, size_t value){
-    *(size_t *)ptr = value & ~1;
-    mm_checkheap(__LINE__);
-
+static inline void set_as_free(void *ptr, size_t value) {
+    PUT(ptr, value & ~1);
     ptr = get_next_ptr(ptr);
-    mm_checkheap(__LINE__);
-
-    if(ptr) *(size_t *)ptr &= ~2;
-    mm_checkheap(__LINE__);
-
+    if (ptr) PUT(ptr, GET(ptr) & ~2);
 }
 
-void set_header_footer_free(void *ptr, size_t value){
-    mm_checkheap(__LINE__);
-
+static inline void set_header_footer_free(void *ptr, size_t value) {
     set_as_free(ptr, value);
-    *(size_t *)((char *)ptr + value - SIZE_T_SIZE) = value;
-    mm_checkheap(__LINE__);
-
+    PUT((char *)ptr + value - SIZE_T_SIZE, value);
 }
 
-void mark_previous_as_free(void *ptr){
-    *(size_t *)ptr &= ~2;
+/* Global root pointer */
+void *root = NULL;
+
+void mm_checkheap(int lineno) {
+    printf("checkheap called from %d\n", lineno);
 }
 
-void *find_header(void *ptr_payload){
-    return (void *)((char *)ptr_payload - SIZE_T_SIZE);
-}
-
-/* 
- * mm_init - initialize the malloc package.
- */
-
-int mm_init(void){
+/*
+* mm_init - initialize the malloc package.
+*/
+int mm_init(void) {
     mem_reset_brk();
-
     root = mem_sbrk(SIZE_T_SIZE);
-    if (root == (void *)-1)
-        return -1;
-
+    if (root == (void *)-1) return -1;
     set_as_allocated(root, SIZE_T_SIZE);
-    heap_end = (char *)root + SIZE_T_SIZE - 1;
     return 0;
 }
 
-
-/* 
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
- */
-void *mm_malloc(size_t size)
-{
-    // printf("\nmallocing block sized %d\n", (int)size);
+/*
+* mm_malloc - Allocate a block by incrementing the brk pointer.
+*     Always allocate a block whose size is a multiple of the alignment.
+*/
+void *mm_malloc(size_t size) {
     int newsize = ALIGN(size + 2 * SIZE_T_SIZE);
-    // printf("Newsize: %d\n", newsize);
     void *p = root;
-    // printf("\ndddd\n");
-
     char *current = root;
     int previous_allocated_flag = 0;
+    char *heap_end = (char *)mem_sbrk(0);
 
-    while (current < (char *)heap_end) {
-        // printf("current: %p\n", (void *)current);
-        // printf("heap_end: %p\n", (void *)heap_end);
+    while (current < heap_end) {
         size_t block_size = get_block_size(current);
-        // printf("pointer to next value: %zu\n", *(size_t *)current);
-        // printf("Block size: %zu\n\n", block_size);
-        // sleep(1);
-        // printf("\neeee\n");
-
         if (!check_allocated(current) && block_size >= newsize) {
-            // printf("\nffff\n");
             if (block_size - newsize >= ALIGN(SIZE_T_SIZE + MIN_PAYLOAD)) {
                 set_header_footer_allocated(current, newsize);
                 p = move_ptr(current, newsize, 1);
@@ -184,167 +143,129 @@ void *mm_malloc(size_t size)
             if (previous_allocated_flag) mark_previous_as_allocated(current);
             previous_allocated_flag = 1;
             return move_ptr(current, SIZE_T_SIZE, 1);
-        } else if (check_allocated(current)) previous_allocated_flag = 1;
-        else previous_allocated_flag = 0;
+        } else if (check_allocated(current)) {
+            previous_allocated_flag = 1;
+        } else {
+            previous_allocated_flag = 0;
+        }
         current += block_size;
-
     }
-    // printf("\ngggg\n");
-    // mm_checkheap(__LINE__);
+
     p = mem_sbrk(newsize);
     if (p == (void *)-1) return NULL;
-    heap_end = (char *)p + newsize - 1;
     set_header_footer_allocated(p, newsize);
-    return move_ptr(p, SIZE_T_SIZE, 1); 
+    return move_ptr(p, SIZE_T_SIZE, 1);
 }
 
-// void *mm_malloc(size_t size)
-// {
-//     int newsize = ALIGN(size + SIZE_T_SIZE);
-//     void *p = mem_sbrk(newsize);
-//     if (p == (void *)-1)
-// 	return NULL;
-//     else {
-//         *(size_t *)p = size;
-//         return (void *)((char *)p + SIZE_T_SIZE);
-//     }
-// }
-
-/*
- * mm_free - Freeing a block does nothing.
- */
-void coalesce(void *ptr){
-    mm_checkheap(__LINE__);
+/* Coalesce the blocks to improve memory usage */
+void *coalesce(void *ptr) {
     size_t size = get_block_size(ptr);
-    int prev_alloc = check_previous_allocated(ptr);
+    void *prev = get_prev_ptr(ptr);
     void *next = get_next_ptr(ptr);
-    int next_alloc = 1;
-    if (next) next_alloc = check_allocated(next);
-    mm_checkheap(__LINE__);
+    int prev_alloc = (prev == NULL) || check_allocated(prev);
+    int next_alloc = (next == NULL) || check_allocated(next);
 
     if (prev_alloc && next_alloc) {
-        mm_checkheap(__LINE__);
-
-        // Case 1: both prev and next are allocated
-        void *next = get_next_ptr(ptr);
-        if (next) mark_previous_as_free(next);
-    
+        if (next != NULL) mark_previous_as_free(next);
         set_header_footer_free(ptr, size);
-    }
-    else if (prev_alloc && !next_alloc) {
-        mm_checkheap(__LINE__);
-
-        // Case 2: prev allocated, next free
-        void *next = get_next_ptr(ptr);
-        if (next) {
-            size += get_block_size(next);
-            set_header_footer_free(ptr, size);
-        } else {
-            set_header_footer_free(ptr, size);
-        }
-    }
-    else if (!prev_alloc && next_alloc) {
-        mm_checkheap(__LINE__);
-
-        // Case 3: prev free, next allocated
-        void *prev = get_prev_ptr(ptr);
-        if (prev) {
-            size += get_block_size(prev);
-            void *next = get_next_ptr(ptr);
-            if (next) mark_previous_as_free(next);
-            set_header_footer_free(prev, size);
-            ptr = prev;
-        } else {
-            set_header_footer_free(ptr, size);
-        }
-    }
-    else {
-        mm_checkheap(__LINE__);
-
-        // Case 4: both prev and next free
-        void *prev = get_prev_ptr(ptr);
-        mm_checkheap(__LINE__);
-
-        void *next = get_next_ptr(ptr);
-        mm_checkheap(__LINE__);
-
-        if (next){
-            printf("heap_end: %p\n", (void *)next);
-            printf("pointer to next value: %zu\n", *(size_t *)next);
-        }
-
-        if (prev){
-            printf("heap_end: %p\n", (void *)prev);
-            printf("pointer to next value: %zu\n", *(size_t *)prev);
-        }
-
-        if (prev && next) {
-            mm_checkheap(__LINE__);
-            size_t a = get_block_size(prev);
-            mm_checkheap(__LINE__);
-
-            size_t b = get_block_size(next);
-            mm_checkheap(__LINE__);
-
-            size += a + b;
-            mm_checkheap(__LINE__);
-
-            set_header_footer_free(prev, size);
-            mm_checkheap(__LINE__);
-
-            ptr = prev;
-            mm_checkheap(__LINE__);
-
-        }
-        else if (prev) {
-            mm_checkheap(__LINE__);
-
-            size += get_block_size(prev);
-            set_header_footer_free(prev, size);
-            ptr = prev;
-        }
-        else if (next) {
-            mm_checkheap(__LINE__);
-
-            size += get_block_size(next);
-            set_header_footer_free(ptr, size);
-        }
-        else {
-            mm_checkheap(__LINE__);
-
-            set_header_footer_free(ptr, size);
-        }
+        return ptr;
+    } else if (prev_alloc && !next_alloc) {
+        size += get_block_size(next);
+        set_header_footer_free(ptr, size);
+        return ptr;
+    } else if (!prev_alloc && next_alloc) {
+        size += get_block_size(prev);
+        if (next != NULL) mark_previous_as_free(next);
+        set_header_footer_free(prev, size);
+        return prev;
+    } else {
+        size += get_block_size(prev) + get_block_size(next);
+        set_header_footer_free(prev, size);
+        return prev;
     }
 }
 
-void mm_free(void *ptr_payload)
-{
+/*
+* mm_free - Free a block and coalesce it with adjacent blocks.
+*/
+void mm_free(void *ptr_payload) {
     if (ptr_payload == NULL) return;
 
-    void *ptr = move_ptr(ptr_payload, SIZE_T_SIZE, -1); 
+    void *ptr = move_ptr(ptr_payload, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
-
     set_header_footer_free(ptr, block_size);
-
     coalesce(ptr);
 }
 
 /*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size)
-{
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
+* mm_realloc - Implement realloc using malloc and free.
+*/
+
+// void *mm_realloc(void *ptr, size_t size)
+// {
+//     void *oldptr = ptr;
+//     void *newptr;
+//     size_t copySize;
     
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+//     newptr = mm_malloc(size);
+//     if (newptr == NULL)
+//     return NULL;
+//     copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+//     if (size < copySize)
+//     copySize = size;
+//     memcpy(newptr, oldptr, copySize);
+//     mm_free(oldptr);
+//     return newptr;
+// }
+
+void *mm_realloc(void *ptr_payload, size_t size) {
+    if (ptr_payload == NULL) {
+        return mm_malloc(size);
+    }
+    if (size == 0) {
+        mm_free(ptr_payload);
+        return NULL;
+    }
+
+    void *ptr = find_header(ptr_payload);
+    size_t old_size = get_block_size(ptr);
+    size_t new_size = ALIGN(size + 2 * SIZE_T_SIZE);
+
+    if (new_size <= old_size) {
+        if (old_size - new_size >= ALIGN(SIZE_T_SIZE + MIN_PAYLOAD)) {
+            set_header_footer_allocated(ptr, new_size);
+            void *next = move_ptr(ptr, new_size, 1);
+            set_header_footer_free(next, old_size - new_size);
+            mark_previous_as_allocated(next);
+        }
+        return ptr_payload;
+    }
+
+    void *next = get_next_ptr(ptr);
+    size_t extra_size = 0;
+    if (next && !check_allocated(next)) {
+        extra_size = get_block_size(next);
+        if (old_size + extra_size >= new_size) {
+            set_header_footer_allocated(ptr, old_size + extra_size);
+            if (old_size + extra_size - new_size >= ALIGN(SIZE_T_SIZE + MIN_PAYLOAD)) {
+                void *split = move_ptr(ptr, new_size, 1);
+                set_header_footer_free(split, old_size + extra_size - new_size);
+                mark_previous_as_allocated(split);
+            }
+            return ptr_payload;
+        }
+    }
+
+    void *new_ptr = mm_malloc(size);
+    if (new_ptr == NULL) {
+        return NULL;
+    }
+
+    size_t copy_size = old_size - 2 * SIZE_T_SIZE;
+    if (size < copy_size) {
+        copy_size = size;
+    }
+    memcpy(new_ptr, ptr_payload, copy_size);
+    mm_free(ptr_payload);
+    return new_ptr;
 }
