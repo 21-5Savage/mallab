@@ -32,23 +32,26 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-#define GET(p) (*(size_t *)(p))
-#define PUT(p, val) (*(size_t *)(p) = (val))
+#define GET_VALUE(p) (*(size_t *)(p))
+#define PUT_VALUE(p, val) (*(size_t *)(p) = (val))
 #define PACK(size, alloc, prev_alloc) ((size) | ((alloc) ? 1 : 0) | ((prev_alloc) ? 2 : 0))
-#define GET_SIZE(p)  (GET(p) & ~0x7)
-#define GET_ALLOC(p) (GET(p) & 0x1)
-#define GET_PREV_ALLOC(p) (GET(p) & 0x2)
+#define GET_SIZE(p)  (GET_VALUE(p) & ~0x7)
+#define GET_ALLOC(p) (GET_VALUE(p) & 0x1)
+#define GET_PREV_ALLOC(p) (GET_VALUE(p) & 0x2)
+
+void *root = NULL;
+
 
 static inline int check_allocated(void *ptr) {
-    return GET(ptr) & 1;
+    return GET_VALUE(ptr) & 1;
 }
 
 static inline int check_previous_allocated(void *ptr) {
-    return GET(ptr) & 2;
+    return GET_VALUE(ptr) & 2;
 }
 
 static inline size_t get_block_size(void *ptr) {
-    return GET(ptr) & ~3;
+    return GET_VALUE(ptr) & ~3;
 }
 
 static inline void *move_ptr(void *ptr, size_t value, int forward) {
@@ -56,20 +59,20 @@ static inline void *move_ptr(void *ptr, size_t value, int forward) {
 }
 
 static inline void set_as_allocated(void *ptr, size_t value) {
-    PUT(ptr, value | 1);
+    PUT_VALUE(ptr, value | 1);
 }
 
 static inline void set_header_footer_allocated(void *ptr, size_t value) {
     set_as_allocated(ptr, value);
-    PUT((char *)ptr + value - SIZE_T_SIZE, value);
+    PUT_VALUE((char *)ptr + value - SIZE_T_SIZE, value);
 }
 
 static inline void mark_previous_as_allocated(void *ptr) {
-    PUT(ptr, GET(ptr) | 2);
+    PUT_VALUE(ptr, GET_VALUE(ptr) | 2);
 }
 
 static inline void mark_previous_as_free(void *ptr) {
-    PUT(ptr, GET(ptr) & ~2);
+    PUT_VALUE(ptr, GET_VALUE(ptr) & ~2);
 }
 
 static inline void *find_header(void *ptr_payload) {
@@ -84,24 +87,23 @@ static inline void *get_next_ptr(void *ptr) {
 }
 
 static inline void *get_prev_ptr(void *ptr) {
+    if (ptr <= root) return NULL;
     ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
     return move_ptr(ptr, block_size - SIZE_T_SIZE, -1);
 }
 
 static inline void set_as_free(void *ptr, size_t value) {
-    PUT(ptr, value & ~1);
+    PUT_VALUE(ptr, value & ~1);
     ptr = get_next_ptr(ptr);
-    if (ptr) PUT(ptr, GET(ptr) & ~2);
+    if (ptr) PUT_VALUE(ptr, GET_VALUE(ptr) & ~2);
 }
 
 static inline void set_header_footer_free(void *ptr, size_t value) {
     set_as_free(ptr, value);
-    PUT((char *)ptr + value - SIZE_T_SIZE, value);
+    PUT_VALUE((char *)ptr + value - SIZE_T_SIZE, value);
 }
 
-/* Global root pointer */
-void *root = NULL;
 
 void mm_checkheap(int lineno) {
     printf("checkheap called from %d\n", lineno);
@@ -132,7 +134,7 @@ void *mm_malloc(size_t size) {
     while (current < heap_end) {
         size_t block_size = get_block_size(current);
         if (!check_allocated(current) && block_size >= newsize) {
-            if (block_size - newsize >= ALIGN(SIZE_T_SIZE + MIN_PAYLOAD)) {
+            if (block_size - newsize >= ALIGN(2 * SIZE_T_SIZE + MIN_PAYLOAD)) {
                 set_header_footer_allocated(current, newsize);
                 p = move_ptr(current, newsize, 1);
                 set_header_footer_free(p, block_size - newsize);
@@ -157,7 +159,6 @@ void *mm_malloc(size_t size) {
     return move_ptr(p, SIZE_T_SIZE, 1);
 }
 
-/* Coalesce the blocks to improve memory usage */
 void *coalesce(void *ptr) {
     size_t size = get_block_size(ptr);
     void *prev = get_prev_ptr(ptr);
