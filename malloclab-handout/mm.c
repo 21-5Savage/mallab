@@ -141,6 +141,7 @@ int mm_init(void){
  */
 void *mm_malloc(size_t size)
 {
+    printf("\nmallocing block sized %d\n", (int)size);
     int newsize = ALIGN(size + 2 * SIZE_T_SIZE);
     // printf("Newsize: %d\n", newsize);
     void *p = root;
@@ -201,28 +202,58 @@ void *mm_malloc(size_t size)
  * mm_free - Freeing a block does nothing.
  */
 void *coalesce(void *ptr){
+    size_t size = get_block_size(ptr);
     int prev_alloc = check_previous_allocated(ptr);
-    int next_alloc = check_allocated(get_next_ptr(ptr));
-    size_t block_size = get_block_size(ptr);
-    size_t size;
     void *next = get_next_ptr(ptr);
-    void *prev = get_prev_ptr(ptr);
-    //case1
-    if (prev_alloc && !next_alloc) {
-        size = get_block_size((get_next_ptr(ptr)));
-        set_as_free(ptr, get_block_size(ptr));
-        set_as_free((void *)(*(char *)ptr + block_size - SIZE_T_SIZE), get_block_size(ptr));
-    }    
-    //case2
-    else if(!prev_alloc && next_alloc){
+    int next_alloc = check_allocated(next);
 
-    }
-    else if(prev_alloc && next_alloc){
-        return ptr;
-    }
-    else{
+    if (prev_alloc && next_alloc) {
+        //case 1 prev and next allocated
+        printf("1Freeing block at %p of size %zu\n", ptr, size);
 
+        void * next = get_next_ptr(ptr);
+        mark_previous_as_free(next);
+
+        set_header_footer_free(ptr, size);
+
+    } 
+    else if (prev_alloc && !next_alloc) {
+        //case 2 prev allocated, next not
+        size += get_block_size(next);
+        printf("2Freeing block at %p of size %zu\n", ptr, size);
+
+        set_header_footer_free(ptr, size);
+    } 
+    else if (!prev_alloc && next_alloc) {
+        //case 3 next allocated, prev not
+        void *prev = get_prev_ptr(ptr);
+
+        void *next = get_next_ptr(ptr);
+        mark_previous_as_free(next);
+
+        size += get_block_size(prev);
+        printf("3Freeing block at %p of size %zu\n", ptr, size);
+
+        set_header_footer_free(prev, size);
+        ptr = prev;
+
+    } 
+    else {
+        //all not allocated
+        void *prev = get_prev_ptr(ptr);
+        size += get_block_size(prev) + get_block_size(next);
+        printf("4Freeing block at %p of size %zu\n", ptr, size);
+
+        set_header_footer_free(prev, size);
+        ptr = prev;
     }
+
+    // Fix prev-allocated bit of the block *after* the coalesced block
+    void *new_next = get_next_ptr(ptr);
+    if ((char *)new_next <= (char *)heap_end) {
+        *(size_t *)new_next &= ~2; // clear prev-allocated bit
+    }
+
     return ptr;
 }
 
@@ -230,9 +261,11 @@ void mm_free(void *ptr)
 {
     if (ptr == NULL) return;
 
-    ptr = move_ptr(ptr, SIZE_T_SIZE, -1);
+    ptr = move_ptr(ptr, SIZE_T_SIZE, -1); 
     size_t block_size = get_block_size(ptr);
-    set_as_free(ptr, block_size);
+
+    set_header_footer_free(ptr, block_size);
+
     coalesce(ptr);
 }
 
