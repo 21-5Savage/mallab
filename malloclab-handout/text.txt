@@ -1,0 +1,343 @@
+after innit
+
+ptr: 0
+value: 8
+flags: 1
+
+
+after malloc sbrk
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+
+after malloc sbrk
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 2056
+flags: 3
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 2056
+flags: 0
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 2056
+flags: 2
+
+
+after malloc fit
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 64
+flags: 3
+
+ptr: 2128
+value: 1992
+flags: 2
+
+
+after malloc sbrk
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 64
+flags: 3
+
+ptr: 2128
+value: 1992
+flags: 2
+
+ptr: 4120
+value: 4088
+flags: 1
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 64
+flags: 3
+
+ptr: 2128
+value: 1992
+flags: 2
+
+ptr: 4120
+value: 4088
+flags: 0
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 64
+flags: 3
+
+ptr: 2128
+value: 6080
+flags: 2
+
+
+after malloc fit
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 3
+
+ptr: 2064
+value: 64
+flags: 3
+
+ptr: 2128
+value: 4088
+flags: 3
+
+ptr: 6216
+value: 1992
+flags: 2
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 0
+
+ptr: 2064
+value: 64
+flags: 1
+
+ptr: 2128
+value: 4088
+flags: 3
+
+ptr: 6216
+value: 1992
+flags: 2
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 2
+
+ptr: 2064
+value: 64
+flags: 1
+
+ptr: 2128
+value: 4088
+flags: 3
+
+ptr: 6216
+value: 1992
+flags: 2
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2056
+flags: 2
+
+ptr: 2064
+value: 64
+flags: 0
+
+ptr: 2128
+value: 4088
+flags: 1
+
+ptr: 6216
+value: 1992
+flags: 2
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2120
+flags: 2
+
+ptr: 2128
+value: 4088
+flags: 1
+
+ptr: 6216
+value: 1992
+flags: 2
+
+
+after malloc sbrk
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2120
+flags: 2
+
+ptr: 2128
+value: 4088
+flags: 1
+
+ptr: 6216
+value: 1992
+flags: 2
+
+ptr: 8208
+value: 4088
+flags: 1
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 2120
+flags: 2
+
+ptr: 2128
+value: 4088
+flags: 0
+
+ptr: 6216
+value: 1992
+flags: 0
+
+ptr: 8208
+value: 4088
+flags: 1
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 8200
+flags: 2
+
+ptr: 8208
+value: 4088
+flags: 1
+
+
+free before coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 8200
+flags: 2
+
+ptr: 8208
+value: 4088
+flags: 0
+
+
+free after coalesce
+
+ptr: 0
+value: 8
+flags: 1
+
+ptr: 8
+value: 12288
+flags: 2

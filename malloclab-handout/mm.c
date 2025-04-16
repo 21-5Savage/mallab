@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -28,16 +29,16 @@ team_t team = {
 #define ALIGNMENT 8
 #define MIN_PAYLOAD 1
 /* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
+#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~7)
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 #define GET_VALUE(p) (*(size_t *)(p))
 #define PUT_VALUE(p, val) (*(size_t *)(p) = (val))
 #define PACK(size, alloc, prev_alloc) ((size) | ((alloc) ? 1 : 0) | ((prev_alloc) ? 2 : 0))
-#define GET_SIZE(p)  (GET_VALUE(p) & ~0x7)
-#define GET_ALLOC(p) (GET_VALUE(p) & 0x1)
-#define GET_PREV_ALLOC(p) (GET_VALUE(p) & 0x2)
+#define GET_SIZE(p)  (GET_VALUE(p) & ~7)
+#define GET_ALLOC(p) (GET_VALUE(p) & 1)
+#define GET_PREV_ALLOC(p) (GET_VALUE(p) & 2)
 
 void *root = NULL;
 
@@ -109,6 +110,20 @@ void mm_checkheap(int lineno) {
     printf("checkheap called from %d\n", lineno);
 }
 
+void print_heap(){
+    char *current = root;
+    char *heap_end = (char *)mem_sbrk(0);
+
+    while (current < heap_end) {
+        // printf("ptr: %lu\n", (unsigned long)(uintptr_t)current);
+        printf("ptr: %lu\n", (unsigned long)(uintptr_t)current - (unsigned long)(uintptr_t)root);
+        printf("value: %zu\n", get_block_size(current));
+        printf("flags: %zu\n\n", GET_VALUE(current) % 8);
+        size_t block_size = get_block_size(current);
+        current += block_size;
+    }
+}
+
 /*
 * mm_init - initialize the malloc package.
 */
@@ -117,6 +132,8 @@ int mm_init(void) {
     root = mem_sbrk(SIZE_T_SIZE);
     if (root == (void *)-1) return -1;
     set_as_allocated(root, SIZE_T_SIZE);
+    printf("\nafter innit\n\n");
+    print_heap();
     return 0;
 }
 
@@ -125,10 +142,11 @@ int mm_init(void) {
 *     Always allocate a block whose size is a multiple of the alignment.
 */
 void *mm_malloc(size_t size) {
+
     int newsize = ALIGN(size + 2 * SIZE_T_SIZE);
     void *p = root;
     char *current = root;
-    int previous_allocated_flag = 0;
+    int previous_allocated_flag = 1;
     char *heap_end = (char *)mem_sbrk(0);
 
     while (current < heap_end) {
@@ -144,6 +162,8 @@ void *mm_malloc(size_t size) {
             }
             if (previous_allocated_flag) mark_previous_as_allocated(current);
             previous_allocated_flag = 1;
+            printf("\nafter malloc fit\n\n");
+            print_heap();
             return move_ptr(current, SIZE_T_SIZE, 1);
         } else if (check_allocated(current)) {
             previous_allocated_flag = 1;
@@ -156,10 +176,14 @@ void *mm_malloc(size_t size) {
     p = mem_sbrk(newsize);
     if (p == (void *)-1) return NULL;
     set_header_footer_allocated(p, newsize);
+    void *prev = get_prev_ptr(p);
+    if (check_allocated(prev)) mark_previous_as_allocated(p);
+    printf("\nafter malloc sbrk\n\n");
+    print_heap();
     return move_ptr(p, SIZE_T_SIZE, 1);
 }
 
-void *coalesce(void *ptr) {
+static inline void coalesce(void *ptr) {
     size_t size = get_block_size(ptr);
     void *prev = get_prev_ptr(ptr);
     void *next = get_next_ptr(ptr);
@@ -169,20 +193,36 @@ void *coalesce(void *ptr) {
     if (prev_alloc && next_alloc) {
         if (next != NULL) mark_previous_as_free(next);
         set_header_footer_free(ptr, size);
-        return ptr;
+        mark_previous_as_allocated(ptr);
     } else if (prev_alloc && !next_alloc) {
         size += get_block_size(next);
+        PUT_VALUE(next, 0);
         set_header_footer_free(ptr, size);
-        return ptr;
+        mark_previous_as_allocated(ptr);
     } else if (!prev_alloc && next_alloc) {
         size += get_block_size(prev);
+        PUT_VALUE(prev, 0);
         if (next != NULL) mark_previous_as_free(next);
         set_header_footer_free(prev, size);
-        return prev;
+
+        void *prev_prev = get_prev_ptr(prev);
+        int prev_prev_alloc = (prev_prev == NULL) || check_allocated(prev_prev);
+        if (prev_prev_alloc) mark_previous_as_allocated(prev);
+
     } else {
-        size += get_block_size(prev) + get_block_size(next);
+        size += get_block_size(prev);
+        size += get_block_size(next);
+        PUT_VALUE(ptr, 0);
+        PUT_VALUE(next, 0);
         set_header_footer_free(prev, size);
-        return prev;
+
+        void *prev_prev = get_prev_ptr(prev);
+        int prev_prev_alloc = (prev_prev == NULL) || check_allocated(prev_prev);
+        if (prev_prev_alloc) mark_previous_as_allocated(prev);
+
+        void *next_next = get_next_ptr(next);
+        if (next_next != NULL) mark_previous_as_free(next_next);
+
     }
 }
 
@@ -195,7 +235,11 @@ void mm_free(void *ptr_payload) {
     void *ptr = move_ptr(ptr_payload, SIZE_T_SIZE, -1);
     size_t block_size = get_block_size(ptr);
     set_header_footer_free(ptr, block_size);
+    printf("\nfree before coalesce\n\n");
+    print_heap();
     coalesce(ptr);
+    printf("\nfree after coalesce\n\n");
+    print_heap();
 }
 
 /*
